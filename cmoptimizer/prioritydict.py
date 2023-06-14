@@ -1,5 +1,3 @@
-import random
-
 import torch
 
 class TensorList(dict):
