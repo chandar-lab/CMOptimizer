@@ -7,8 +7,8 @@ We also provide a faster and efficient GPU-based version of Critical Gradients o
 This code is compatible with the following versions:
 
 ```
-python >= 3.6
-pytorch >= 1.7.1
+python >= 3.9
+pytorch >= 1.13.1
 ```
 
 ## Installation

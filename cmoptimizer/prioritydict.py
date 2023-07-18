@@ -45,7 +45,7 @@ class TensorList(dict):
             # print(self._heap_key[:self.curr_k], self._heap.shape)
 
 
-    def addItem(self, key, val, bid=None, alpha=1):
+    def addItem(self, key, val, alpha=1):
         if self.k==0:
             return
         if self.dtype is not None:
@@ -55,19 +55,13 @@ class TensorList(dict):
             self.aggr_sum.add_(-self._heap[self.smallest])
             self._heap_key[self.smallest] = key
             self._heap[self.smallest] = val
-            if bid is not None:
-                self.bids[self.smallest] = bid
         else:
             if self.curr_k==0:
                 self._heap_key = torch.zeros(self.k, device=key.device, dtype=key.dtype)
                 self._heap_coeff = torch.ones(self.k, device=key.device, dtype=key.dtype)
                 self._heap = torch.zeros(self.k, *val.shape, device=val.device, dtype=val.dtype)
-                if bid is not None:
-                    self.bids = torch.zeros(self.k, device=key.device, dtype=int)
             self._heap_key[self.curr_k] = key
             self._heap[self.curr_k] = val
-            if bid is not None:
-                self.bids[self.curr_k] = bid
             self.curr_k += 1
 
         if self.aggr_sum is None:
@@ -86,10 +80,10 @@ class TensorList(dict):
         return self.curr_k == 0
 
     def get_weighted_sum(self):
-        sm = (1-self._heap_coeff[0])*self._heap[0]
+        weighted_sum = (1-self._heap_coeff[0])*self._heap[0]
         for j in range(1,self.curr_k):
-            sm = sm.add_(self._heap[j], alpha=1-self._heap_coeff[j])
-        return sm
+            weighted_sum = weighted_sum.add_(self._heap[j], alpha=1-self._heap_coeff[j])
+        return weighted_sum
 
     def decay_vals(self, factor):
         self._heap = torch.mul(self._heap, factor)
@@ -109,13 +103,13 @@ class TensorList(dict):
         return self.curr_k == self.k # len(self._heap) >= self.k
 
     def averageTopC(self):
-        ave = 0.
+        average_topc = 0.
         if self.curr_k > 0:
             if not self.hist:
-                ave = torch.sum([it.norm() for it in self._heap]) / float(self.curr_k)
+                average_topc = torch.sum([it.norm() for it in self._heap]) / float(self.curr_k)
             else:
-                ave = torch.sum([it.g.norm() for it in self._heap]) / float(self.curr_k)
-        return ave
+                average_topc = torch.sum([it.g.norm() for it in self._heap]) / float(self.curr_k)
+        return average_topc
 
     def getMin(self):
         """
