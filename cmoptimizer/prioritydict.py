@@ -15,17 +15,16 @@ class TensorList(dict):
         # self.aggr_sq_sum = None
         self.smallest = 0
 
-    def getNorms(self):
+    def get_norms(self):
         return self._heap_key
 
     def size(self):
         return self.curr_k
 
-    def setHyper(self, decay_rate=0.5, K=5, sampling='KotH', hist=False, dtype=None):
+    def set_hyper(self, decay_rate=0.5, K=5, hist=False, dtype=None):
         self.k = K
         self.curr_k = 0
         self.decay_rate = decay_rate
-        self.sampling = sampling
         self.hist = hist
         self.dtype = dtype
 
@@ -45,12 +44,12 @@ class TensorList(dict):
             # print(self._heap_key[:self.curr_k], self._heap.shape)
 
 
-    def addItem(self, key, val, alpha=1):
+    def add_item(self, key, val, alpha=1):
         if self.k==0:
             return
         if self.dtype is not None:
             val = val.to(dtype=self.dtype)
-        if self.isFull():
+        if self.is_full():
             self._heap = self._heap.to(val.device)
             self.aggr_sum.add_(-self._heap[self.smallest])
             self._heap_key[self.smallest] = key
@@ -69,14 +68,14 @@ class TensorList(dict):
             # self.aggr_sq_sum = torch.zeros_like(val)
         self.aggr_sum.add_(val, alpha=alpha)
 
-    def pokeSmallest(self):
+    def poke_smallest(self):
         """Return the lowest priority.
         Raises IndexError if the object is empty.
         """
         self.smallest = torch.argmin(self._heap_key)
         return self._heap_key[self.smallest]
 
-    def isEmpty(self):
+    def is_empty(self):
         return self.curr_k == 0
 
     def get_weighted_sum(self):
@@ -94,15 +93,15 @@ class TensorList(dict):
     def decay(self):
         self._heap_key = torch.mul(self._heap_key, self.decay_rate)
 
-    def updateKey(self, val, key):
+    def update_key(self, val, key):
         index = (self._heap == val).nonzero(as_tuple=True)
         if len(index[0])>0:
             self._heap_key[int(index[0][0])] = key
 
-    def isFull(self):
+    def is_full(self):
         return self.curr_k == self.k # len(self._heap) >= self.k
 
-    def averageTopC(self):
+    def average_topc(self):
         average_topc = 0.
         if self.curr_k > 0:
             if not self.hist:
@@ -111,14 +110,14 @@ class TensorList(dict):
                 average_topc = torch.sum([it.g.norm() for it in self._heap]) / float(self.curr_k)
         return average_topc
 
-    def getMin(self):
+    def get_min(self):
         """
         Get smallest gradient
         :return: The smallest gradient
         """
         return self._heap[self.smallest]
 
-    def getMax(self):
+    def get_max(self):
         "Returns the largest gradient"
         return self._heap[torch.argmax(self._heap_key)]
 

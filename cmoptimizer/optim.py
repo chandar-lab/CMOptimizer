@@ -14,16 +14,23 @@ class Adam_CM(Optimizer):
     Replaces current-iteration gradient in conventional PyTorch implementation with
     an aggregation of current momentum and critical momenta.
 
-    Conventional Adam can be recovered by setting kappa=0.
-
     The critical-gradient-specific keyword parameters are tuned for good
     off-the-shelf performance, though additional tuning may be required for best results
+
+    decay: The decay rate of buffer priorities.
+    kappa: Conventional Adam can be recovered by setting kappa=0.
+    topc: Maximum capacity of the buffer.
+    critical_test: Probability of using FIFO buffer where 0.0 indicates priority-based replacement and 1.0 indicates FIFO.
+    synced: Store buffer quantities as entire model parameters. False indicates storing layer-wise buffer quantities.
+    buffer_dtype: Specify datatype for buffer quantities. Set is None to use default one.
+    
+    Please refer to the Adam implementation from pytorch for all other hyperparameters.
     """
 
     def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8,
                  decay=0.7, kappa=1.0, topC=5,
-                 weight_decay=0, amsgrad=False, aggr='mean', sampling=None,
-                 critical_test=True, synced=True, buffer_dtype=None):
+                 weight_decay=0, amsgrad=False, 
+                 critical_test=0.0, synced=True, buffer_dtype=None):
         if not 0.0 <= lr:
             raise ValueError("Invalid learning rate: {}".format(lr))
         if not 0.0 <= eps:
@@ -37,19 +44,19 @@ class Adam_CM(Optimizer):
         if not 0.0 <= topC:
             raise ValueError("Invalid topC value: {}".format(topC))
         defaults = dict(lr=lr, betas=betas, eps=eps,
-                        weight_decay=weight_decay, aggr=aggr, amsgrad=amsgrad,
-                        kappa=kappa, topC=topC, decay=decay, sampling=sampling,
+                        weight_decay=weight_decay,  amsgrad=amsgrad,
+                        kappa=kappa, topC=topC, decay=decay, 
                         critical_test=critical_test,
                         synced=synced, buffer_dtype=buffer_dtype)
 
         super(Adam_CM, self).__init__(params, defaults)
-        self.resetOfflineStats()
-        self.resetAnalysis()
+        self.reset_offline_stats()
+        self.reset_analysis()
 
-    def getOfflineStats(self):
+    def get_offline_stats(self):
         return self.offline_grad
 
-    def resetOfflineStats(self):
+    def reset_offline_stats(self):
         self.offline_grad = {'yes': 0, 'no': 0}
 
     def __setstate__(self, state):
@@ -57,10 +64,10 @@ class Adam_CM(Optimizer):
         for group in self.param_groups:
             group.setdefault('amsgrad', False)
 
-    def getAnalysis(self):
+    def get_analysis(self):
         return self.g_analysis
 
-    def resetAnalysis(self):
+    def reset_analysis(self):
         self.g_analysis = {'gt': 0., 'gc': 0., 'count': 0, 'gc_aggr': 0}
 
     @torch.no_grad()
@@ -103,8 +110,7 @@ class Adam_CM(Optimizer):
                 kappa = group['kappa']
                 decay = group['decay']
                 topc = group['topC']
-                aggr = group['aggr']
-                sampling = group['sampling']
+                
                 critical_test = group['critical_test']
                 buffer_dtype = group['buffer_dtype']
 
@@ -122,9 +128,9 @@ class Adam_CM(Optimizer):
                     state['exp_avg_sq'] = torch.zeros_like(p.data)  
                     if kappa > 0.:
                         state['critical gradients'] = TensorList()
-                        state['critical gradients'].setHyper(decay_rate=decay, K=topc, sampling=sampling,
-                                                             dtype=buffer_dtype)
-                        state['critical gradients'].addItem(grad_norm, deepcopy(grad))
+                        state['critical gradients'].set_hyper(decay_rate=decay, K=topc, 
+                                                              dtype=buffer_dtype)
+                        state['critical gradients'].add_item(grad_norm, deepcopy(grad))
                     if amsgrad:
                         # Maintains max of all exp. moving avg. of sq. grad. values
                         state['max_exp_avg_sq'] = torch.zeros_like(p.data)  
@@ -134,18 +140,18 @@ class Adam_CM(Optimizer):
                     if kappa > 0.:
                         aggr_mean = state['critical gradients'].aggr_sum.div(state['critical gradients'].size())
                         aggr_grad = torch.add(exp_avg, aggr_mean)
-                        if state['critical gradients'].isFull():
+                        if state['critical gradients'].is_full():
                             if np.random.uniform() >= critical_test:
-                                if grad_norm > state['critical gradients'].pokeSmallest():
+                                if grad_norm > state['critical gradients'].poke_smallest():
                                     self.offline_grad['yes'] += 1
-                                    state['critical gradients'].addItem(grad_norm, deepcopy(exp_avg))
+                                    state['critical gradients'].add_item(grad_norm, deepcopy(exp_avg))
                                 else:
                                     self.offline_grad['no'] += 1
                             else:
                                 self.offline_grad['yes'] += 1
-                                state['critical gradients'].addItem(grad_norm, deepcopy(exp_avg))
+                                state['critical gradients'].add_item(grad_norm, deepcopy(exp_avg))
                         else:
-                            state['critical gradients'].addItem(grad_norm, deepcopy(exp_avg))
+                            state['critical gradients'].add_item(grad_norm, deepcopy(exp_avg))
                         exp_avg = aggr_grad
 
                 exp_avg_sq = state['exp_avg_sq']
@@ -182,16 +188,23 @@ class Adam_C(Optimizer):
     Replaces current-iteration gradient in conventional PyTorch implementation with
     an aggregation of current gradient and critical gradients.
 
-    Conventional Adam can be recovered by setting kappa=0.
-
     The critical-gradient-specific keyword parameters are tuned for good
     off-the-shelf performance, though additional tuning may be required for best results
+
+    decay: The decay rate of buffer priorities.
+    kappa: Conventional Adam can be recovered by setting kappa=0.
+    topc: Maximum capacity of the buffer.
+    critical_test: Probability of using FIFO buffer where 0.0 indicates priority-based replacement and 1.0 indicates FIFO.
+    synced: Store buffer quantities as entire model parameters. False indicates storing layer-wise buffer quantities.
+    buffer_dtype: Specify datatype for buffer quantities. Set is None to use default one.
+
+    Please refer to the Adam implementation from pytorch for all other hyperparameters.
     """
 
     def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8,
                  decay=0.7, kappa=1.0, topC=10,
-                 weight_decay=0, amsgrad=False, aggr='mean', sampling=None,
-                 critical_test=True, synced=True, buffer_dtype=None):
+                 weight_decay=0, amsgrad=False, 
+                 critical_test=0.0, synced=True, buffer_dtype=None):
         if not 0.0 <= lr:
             raise ValueError("Invalid learning rate: {}".format(lr))
         if not 0.0 <= eps:
@@ -205,19 +218,19 @@ class Adam_C(Optimizer):
         if not 0.0 <= topC:
             raise ValueError("Invalid topC value: {}".format(topC))
         defaults = dict(lr=lr, betas=betas, eps=eps,
-                        weight_decay=weight_decay, aggr=aggr, amsgrad=amsgrad,
-                        kappa=kappa, topC=topC, decay=decay, sampling=sampling,
+                        weight_decay=weight_decay,  amsgrad=amsgrad,
+                        kappa=kappa, topC=topC, decay=decay, 
                         critical_test=critical_test,
                         synced=synced, buffer_dtype=buffer_dtype)
 
         super(Adam_C, self).__init__(params, defaults)
-        self.resetOfflineStats()
-        self.resetAnalysis()
+        self.reset_offline_stats()
+        self.reset_analysis()
 
-    def getOfflineStats(self):
+    def get_offline_stats(self):
         return self.offline_grad
 
-    def resetOfflineStats(self):
+    def reset_offline_stats(self):
         self.offline_grad = {'yes': 0, 'no': 0}
 
     def __setstate__(self, state):
@@ -225,10 +238,10 @@ class Adam_C(Optimizer):
         for group in self.param_groups:
             group.setdefault('amsgrad', False)
 
-    def getAnalysis(self):
+    def get_analysis(self):
         return self.g_analysis
 
-    def resetAnalysis(self):
+    def reset_analysis(self):
         self.g_analysis = {'gt': 0., 'gc': 0., 'count': 0, 'gc_aggr': 0}
 
     @torch.no_grad()
@@ -268,8 +281,6 @@ class Adam_C(Optimizer):
                 kappa = group['kappa']
                 decay = group['decay']
                 topc = group['topC']
-                aggr = group['aggr']
-                sampling = group['sampling']
                 critical_test = group['critical_test']
                 buffer_dtype = group['buffer_dtype']
 
@@ -286,9 +297,9 @@ class Adam_C(Optimizer):
                         p.data)  
                     if kappa > 0.:
                         state['critical gradients'] = TensorList()
-                        state['critical gradients'].setHyper(decay_rate=decay, K=topc, sampling=sampling,
-                                                             dtype=buffer_dtype)
-                        state['critical gradients'].addItem(grad_norm, deepcopy(grad))
+                        state['critical gradients'].set_hyper(decay_rate=decay, K=topc, 
+                                                              dtype=buffer_dtype)
+                        state['critical gradients'].add_item(grad_norm, deepcopy(grad))
                     if amsgrad:
                         # Maintains max of all exp. moving avg. of sq. grad. values
                         state['max_exp_avg_sq'] = torch.zeros_like(p.data)  
@@ -296,18 +307,18 @@ class Adam_C(Optimizer):
                     if kappa > 0.:
                         aggr_mean = state['critical gradients'].aggr_sum.div(state['critical gradients'].size())
                         aggr_grad = torch.add(grad, aggr_mean)
-                        if state['critical gradients'].isFull():
+                        if state['critical gradients'].is_full():
                             if np.random.uniform() >= critical_test:
-                                if grad_norm > state['critical gradients'].pokeSmallest():
+                                if grad_norm > state['critical gradients'].poke_smallest():
                                     self.offline_grad['yes'] += 1
-                                    state['critical gradients'].addItem(grad_norm, deepcopy(grad))
+                                    state['critical gradients'].add_item(grad_norm, deepcopy(grad))
                                 else:
                                     self.offline_grad['no'] += 1
                             else:
                                 self.offline_grad['yes'] += 1
-                                state['critical gradients'].addItem(grad_norm, deepcopy(grad))
+                                state['critical gradients'].add_item(grad_norm, deepcopy(grad))
                         else:
-                            state['critical gradients'].addItem(grad_norm, deepcopy(grad))
+                            state['critical gradients'].add_item(grad_norm, deepcopy(grad))
                     grad = aggr_grad
                 
                 exp_avg, exp_avg_sq = state['exp_avg'], state['exp_avg_sq']
@@ -348,15 +359,22 @@ class RMSprop_C(Optimizer):
     Replaces current-iteration gradient in conventional PyTorch implementation with
     an aggregation of current gradient and critical gradients.
 
-    Conventional RMSprop can be recovered by setting kappa=0.
-
     The critical-gradient-specific keyword parameters are tuned for good
     off-the-shelf performance, though additional tuning may be required for best results
+
+    decay: The decay rate of buffer priorities.
+    kappa: Conventional RMSprop can be recovered by setting kappa=0.
+    topc: Maximum capacity of the buffer.
+    critical_test: Probability of using FIFO buffer where 0.0 indicates priority-based replacement and 1.0 indicates FIFO.
+    synced: Store buffer quantities as entire model parameters. False indicates storing layer-wise buffer quantities.
+    buffer_dtype: Specify datatype for buffer quantities. Set is None to use default one.
+
+    Please refer to the RMSprop implementation from pytorch for all other hyperparameters.
     """
 
     def __init__(self, params, lr=1e-2, alpha=0.99, eps=1e-8, weight_decay=0,
                  momentum=0, centered=False, decay=0.7, kappa=1.0,
-                 topC=10, aggr='mean', sampling=None, critical_test=True, synced=True, buffer_dtype=None):
+                 topC=10, critical_test=0.0, synced=True, buffer_dtype=None):
         if not 0.0 <= lr:
             raise ValueError("Invalid learning rate: {}".format(lr))
         if not 0.0 <= eps:
@@ -372,9 +390,9 @@ class RMSprop_C(Optimizer):
 
         defaults = dict(lr=lr, momentum=momentum, alpha=alpha, eps=eps,
                         centered=centered, weight_decay=weight_decay,
-                        aggr=aggr, kappa=kappa, topC=topC, decay=decay, synced=synced, buffer_dtype=buffer_dtype)
+                         kappa=kappa, topC=topC, decay=decay, synced=synced, buffer_dtype=buffer_dtype)
         super(RMSprop_C, self).__init__(params, defaults)
-        self.resetOfflineStats()
+        self.reset_offline_stats()
 
     def __setstate__(self, state):
         super(RMSprop_C, self).__setstate__(state)
@@ -418,7 +436,6 @@ class RMSprop_C(Optimizer):
                 kappa = group['kappa']
                 decay = group['decay']
                 topc = group['topC']
-                aggr = group['aggr']
                 buffer_dtype = group['buffer_dtype']
 
                 state = self.state[p]
@@ -433,20 +450,20 @@ class RMSprop_C(Optimizer):
                         state['grad_avg'] = torch.zeros_like(p, memory_format=torch.preserve_format)
                     if kappa > 0.:
                         state['critical gradients'] = TensorList()
-                        state['critical gradients'].setHyper(decay_rate=decay, K=topc, dtype=buffer_dtype)
-                        state['critical gradients'].addItem(grad_norm, deepcopy(grad))
+                        state['critical gradients'].set_hyper(decay_rate=decay, K=topc, dtype=buffer_dtype)
+                        state['critical gradients'].add_item(grad_norm, deepcopy(grad))
                 else:
                     # aggr_grad = aggregate(grad, state['critical gradients'], aggr)
                     aggr_mean = state['critical gradients'].aggr_sum.div(state['critical gradients'].size())
                     if kappa > 0.:
-                        if state['critical gradients'].isFull():
-                            if grad_norm > state['critical gradients'].pokeSmallest():
+                        if state['critical gradients'].is_full():
+                            if grad_norm > state['critical gradients'].poke_smallest():
                                 self.offline_grad['yes'] += 1
-                                state['critical gradients'].addItem(grad_norm, deepcopy(grad))
+                                state['critical gradients'].add_item(grad_norm, deepcopy(grad))
                             else:
                                 self.offline_grad['no'] += 1
                         else:
-                            state['critical gradients'].addItem(grad_norm, deepcopy(grad))
+                            state['critical gradients'].add_item(grad_norm, deepcopy(grad))
                     grad = aggr_mean
                 square_avg = state['square_avg']
                 alpha = group['alpha']
@@ -476,10 +493,10 @@ class RMSprop_C(Optimizer):
 
         return loss
 
-    def getOfflineStats(self):
+    def get_offline_stats(self):
         return self.offline_grad
 
-    def resetOfflineStats(self):
+    def reset_offline_stats(self):
         self.offline_grad = {'yes': 0, 'no': 0}
 
 
@@ -489,15 +506,22 @@ class SGD_C(Optimizer):
     Replaces current-iteration gradient in conventional PyTorch implementation with
     an aggregation of current gradient and critical gradients.
 
-    Conventional SGD or SGD with momentum can be recovered by setting kappa=0.
-
     The critical-gradient-specific keyword parameters are tuned for good
     off-the-shelf performance, though additional tuning may be required for best results
+
+    decay: The decay rate of buffer priorities.
+    kappa: Conventional SGD or SGD with momentum can be recovered by setting kappa=0.
+    topc: Maximum capacity of the buffer.
+    critical_test: Probability of using FIFO buffer where 0.0 indicates priority-based replacement and 1.0 indicates FIFO.
+    synced: Store buffer quantities as entire model parameters. False indicates storing layer-wise buffer quantities.
+    buffer_dtype: Specify datatype for buffer quantities. Set is None to use default one.
+
+    Please refer to the SGD implementation from pytorch for all other hyperparameters.
     """
 
     def __init__(self, params, lr=0.001, kappa=1.0, dampening=0.,
                  weight_decay=0, momentum=0.,
-                 decay=0.7, topC=10, aggr='sum', sampling=None, critical_test=True,
+                 decay=0.7, topC=10, critical_test=0.0,
                  synced=True, buffer_dtype=None):
 
         if momentum < 0.0:
@@ -510,24 +534,24 @@ class SGD_C(Optimizer):
             raise ValueError("Invalid topC value: {}".format(topC))
 
         defaults = dict(lr=lr, kappa=kappa, dampening=dampening,
-                        weight_decay=weight_decay, momentum=momentum, aggr=aggr,
+                        weight_decay=weight_decay, momentum=momentum, 
                         decay=decay, gradHist={}, topC=topC,
-                        sampling=sampling, critical_test=critical_test, synced=synced, buffer_dtype=buffer_dtype)
+                        critical_test=critical_test, synced=synced, buffer_dtype=buffer_dtype)
 
         super(SGD_C, self).__init__(params, defaults)
-        self.resetOfflineStats()
-        self.resetAnalysis()
+        self.reset_offline_stats()
+        self.reset_analysis()
 
-    def getOfflineStats(self):
+    def get_offline_stats(self):
         return self.offline_grad
 
-    def getAnalysis(self):
+    def get_analysis(self):
         return self.g_analysis
 
-    def resetAnalysis(self):
+    def reset_analysis(self):
         self.g_analysis = {'gt': 0., 'gc': 0., 'count': 0, 'gc_aggr': 0}
 
-    def resetOfflineStats(self):
+    def reset_offline_stats(self):
         self.offline_grad = {'yes': 0, 'no': 0}
 
     def __setstate__(self, state):
@@ -553,8 +577,7 @@ class SGD_C(Optimizer):
             decay = group['decay']
             momentum = group['momentum']
             topc = group['topC']
-            aggr = group['aggr']
-            sampling = group['sampling']
+            
             critical_test = group['critical_test']
             synced = group['synced']
             buffer_dtype = group['buffer_dtype']
@@ -580,24 +603,24 @@ class SGD_C(Optimizer):
 
                     if 'critical gradients' not in param_state or len(param_state['critical gradients']) == 0:
                         crit_buf = param_state['critical gradients'] = TensorList()
-                        crit_buf.setHyper(decay_rate=decay, K=topc, sampling=sampling, dtype=buffer_dtype)
-                        crit_buf.addItem(d_p_norm, deepcopy(d_p))
+                        crit_buf.set_hyper(decay_rate=decay, K=topc, dtype=buffer_dtype)
+                        crit_buf.add_item(d_p_norm, deepcopy(d_p))
                     else:
                         crit_buf = param_state['critical gradients']
                         aggr_mean = crit_buf.aggr_sum.div(crit_buf.size())
                         aggr_grad = torch.add(d_p, aggr_mean)
-                        if crit_buf.isFull():
+                        if crit_buf.is_full():
                             if np.random.uniform() >= critical_test:
-                                if d_p_norm > crit_buf.pokeSmallest():
+                                if d_p_norm > crit_buf.poke_smallest():
                                     self.offline_grad['yes'] += 1
-                                    crit_buf.addItem(d_p_norm, deepcopy(d_p))
+                                    crit_buf.add_item(d_p_norm, deepcopy(d_p))
                                 else:
                                     self.offline_grad['no'] += 1
                             else:
                                 self.offline_grad['yes'] += 1
-                                crit_buf.addItem(d_p_norm, deepcopy(d_p))
+                                crit_buf.add_item(d_p_norm, deepcopy(d_p))
                         else:
-                            crit_buf.addItem(d_p_norm, deepcopy(d_p))
+                            crit_buf.add_item(d_p_norm, deepcopy(d_p))
                         d_p = aggr_grad
 
                     if decay != 0.0:

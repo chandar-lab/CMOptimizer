@@ -11,7 +11,7 @@ setup(name='cmoptimizer',
       author_email='pranshu.malviya@mila.quebec',
       license='MIT',
       install_requires=[
-          'torch'
+          'torch>=1.13.1'
       ],
       packages=['cmoptimizer'],
       zip_safe=False)
