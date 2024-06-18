@@ -1,8 +1,8 @@
-# Critical Momenta Optimizers
+# Promoting Exploration in Memory-Augmented Adam using Critical Momenta (TMLR 2024)
 
-Critical Momenta (CM) optimizers from the "Promoting Exploration in Memory-Augmented Adam
-using Critical Momenta" project and [paper](https://arxiv.org/abs/2307.09638), reformatted as package and stripped down to just the necessary components to integrate the optimizers into your code.
+This is the official repository for [Critical Momenta Optimizer](https://openreview.net/forum?id=sHSkJqyQgW), reformatted as package and stripped down to just the necessary components to integrate the optimizers into your code.
 We also provide a faster and efficient GPU-based version of Critical Gradients optimizer from the paper from the "Memory Augmented Optimizers for Deep Learning" project and [paper](https://arxiv.org/abs/2106.10708).
+
 
 This code is compatible with the following versions:
 
