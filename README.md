@@ -58,19 +58,16 @@ Hyperparameter  `topC` determines how many critical gradients are stored and thu
 
 Hyperparameter `decay` indicates the level of decay in the buffer. This modifies how frequently the buffer is refreshed. The `decay` parameter must fall between 0 and 1. We recommended using values 0.7 and 0.99.
 
-[//]: # (## Citation)
+## Citation
+```
+@article{
+    malviya2024promoting,
+    title={Promoting Exploration in Memory-Augmented Adam using Critical Momenta},
+    author={Pranshu Malviya and Goncalo Mordido and Aristide Baratin and Reza Babanezhad Harikandeh and Jerry Huang and Simon Lacoste-Julien and Razvan Pascanu and Sarath Chandar},
+    journal={Transactions on Machine Learning Research},
+    issn={2835-8856},
+    year={2024},
+    url={https://openreview.net/forum?id=sHSkJqyQgW},
+}
+```
 
-[//]: # ()
-[//]: # (```)
-
-[//]: # (@misc{malviya021memory,)
-
-[//]: # (  author    = {McRae, Paul-Aymeric and Parthasarathi, Prasanna and Assran, Mahmoud and Chandar, Sarath},)
-
-[//]: # (  title     = {Memory Augmented Optimizers for Deep Learning},)
-
-[//]: # (  year      = {2022},)
-
-[//]: # (  booktitle = {Proceedings of ICLR})
-
-[//]: # (})
